@@ -6,7 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -74,7 +74,7 @@ import com.example.myapplication.ui.screens.LoginScreen
 const val TAG = "SmartFridgeApp"
 
 // --- Activity ---
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         

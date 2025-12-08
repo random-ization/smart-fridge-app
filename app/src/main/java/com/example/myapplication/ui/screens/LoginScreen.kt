@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.fragment.app.FragmentActivity
+import androidx.appcompat.app.AppCompatActivity
 import com.example.myapplication.auth.BiometricHelper
 import com.example.myapplication.auth.User
 import com.example.myapplication.auth.UserPreferences
@@ -35,7 +35,7 @@ fun LoginScreen(
     onLoginSuccess: (User) -> Unit
 ) {
     val context = LocalContext.current
-    val activity = context as? FragmentActivity
+    val activity = context as? AppCompatActivity
     
     var users by remember { mutableStateOf(userPreferences.getUsers()) }
     var showAddUserDialog by remember { mutableStateOf(false) }

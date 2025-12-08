@@ -1,6 +1,6 @@
 package com.example.myapplication.auth
 
-import android.content.Context
+import android.os.Build
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -9,28 +9,63 @@ import androidx.fragment.app.FragmentActivity
 /**
  * Helper class for biometric and device credential authentication
  * Supports fingerprint, face recognition, PIN, pattern, and password
+ * Compatible with Android 8.0+ (API 26+)
  */
 class BiometricHelper(private val activity: FragmentActivity) {
     
-    private val biometricManager = BiometricManager.from(activity)
+    private val biometricManager: BiometricManager? = try {
+        BiometricManager.from(activity)
+    } catch (e: Exception) {
+        null
+    }
     
     companion object {
-        // Allow biometric + device credential (PIN/pattern/password)
-        private const val AUTHENTICATORS = BiometricManager.Authenticators.BIOMETRIC_STRONG or 
-            BiometricManager.Authenticators.BIOMETRIC_WEAK or 
-            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        /**
+         * Get appropriate authenticators based on Android version
+         * - API 30+: BIOMETRIC_STRONG | BIOMETRIC_WEAK | DEVICE_CREDENTIAL
+         * - API 28-29: BIOMETRIC_WEAK | DEVICE_CREDENTIAL  
+         * - API 26-27: BIOMETRIC_WEAK only (DEVICE_CREDENTIAL not supported)
+         */
+        fun getAuthenticators(): Int {
+            return when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                    // Android 11+ (API 30+)
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                }
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
+                    // Android 9-10 (API 28-29)
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                }
+                else -> {
+                    // Android 8.0-8.1 (API 26-27)
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+                }
+            }
+        }
     }
     
     /**
      * Check if any authentication method is available
      */
     fun isBiometricAvailable(): BiometricStatus {
-        return when (biometricManager.canAuthenticate(AUTHENTICATORS)) {
-            BiometricManager.BIOMETRIC_SUCCESS -> BiometricStatus.AVAILABLE
-            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> BiometricStatus.NO_HARDWARE
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> BiometricStatus.HARDWARE_UNAVAILABLE
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> BiometricStatus.NOT_ENROLLED
-            else -> BiometricStatus.UNAVAILABLE
+        if (biometricManager == null) {
+            return BiometricStatus.UNAVAILABLE
+        }
+        
+        return try {
+            when (biometricManager.canAuthenticate(getAuthenticators())) {
+                BiometricManager.BIOMETRIC_SUCCESS -> BiometricStatus.AVAILABLE
+                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> BiometricStatus.NO_HARDWARE
+                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> BiometricStatus.HARDWARE_UNAVAILABLE
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> BiometricStatus.NOT_ENROLLED
+                else -> BiometricStatus.UNAVAILABLE
+            }
+        } catch (e: Exception) {
+            // Handle any unexpected errors on specific devices
+            BiometricStatus.UNAVAILABLE
         }
     }
     
@@ -44,35 +79,44 @@ class BiometricHelper(private val activity: FragmentActivity) {
         onError: (String) -> Unit,
         onFailed: () -> Unit
     ) {
-        val executor = ContextCompat.getMainExecutor(activity)
-        
-        val callback = object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onSuccess()
+        try {
+            val executor = ContextCompat.getMainExecutor(activity)
+            
+            val callback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    onSuccess()
+                }
+                
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    onError(errString.toString())
+                }
+                
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    onFailed()
+                }
             }
             
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                onError(errString.toString())
+            val biometricPrompt = BiometricPrompt(activity, executor, callback)
+            
+            val authenticators = getAuthenticators()
+            val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .setAllowedAuthenticators(authenticators)
+            
+            // setNegativeButtonText is required when DEVICE_CREDENTIAL is not used
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+                promptInfoBuilder.setNegativeButtonText("Cancel")
             }
             
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-                onFailed()
-            }
+            biometricPrompt.authenticate(promptInfoBuilder.build())
+        } catch (e: Exception) {
+            // If authentication fails to start, report error
+            onError("Authentication unavailable: ${e.message}")
         }
-        
-        val biometricPrompt = BiometricPrompt(activity, executor, callback)
-        
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setAllowedAuthenticators(AUTHENTICATORS)
-            // Note: setNegativeButtonText cannot be used with DEVICE_CREDENTIAL
-            .build()
-        
-        biometricPrompt.authenticate(promptInfo)
     }
     
     enum class BiometricStatus {
