@@ -1,17 +1,17 @@
 package com.example.myapplication.ai
 
+import com.example.myapplication.BuildConfig
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// ★★★ PLEASE REPLACE WITH YOUR API KEY ★★★
-private const val API_KEY = "AIzaSyC3m6lafTny-9C_BUeOYLfLXaqZdhb6YA"
-
-private val generativeModel = GenerativeModel(
-    modelName = "gemini-2.5-flash",
-    apiKey = API_KEY
-)
+private val generativeModel by lazy {
+    GenerativeModel(
+        modelName = "gemini-2.0-flash",
+        apiKey = BuildConfig.GEMINI_API_KEY
+    )
+}
 
 /**
  * AI Service for processing receipts and generating recipes
